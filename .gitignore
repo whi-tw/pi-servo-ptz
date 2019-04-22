@@ -1,1 +1,3 @@
 .vscode
+*.pyc
+src/curpos.json src/servos.json

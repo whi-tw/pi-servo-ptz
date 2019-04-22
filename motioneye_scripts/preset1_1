@@ -1,0 +1,9 @@
+#!/bin/sh
+curl -H "Content-Type: application/json"\
+  -X POST \
+  -d '{"position": 300}' \
+  http://192.168.21.7:5000/absolute/y
+curl -H "Content-Type: application/json"\
+  -X POST \
+  -d '{"position": 550}' \
+  http://192.168.21.7:5000/absolute/x

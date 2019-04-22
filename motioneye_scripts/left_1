@@ -1,0 +1,6 @@
+#!/bin/sh
+curl -H "Content-Type: application/json"\
+  -X POST \
+  -d '{"movement": 25}' \
+  http://192.168.21.7:5000/relative/x
+#ssh -i /etc/motioneye/pi_rsa -oStrictHostKeyChecking=no pi@192.168.21.7 /home/pi/motion_eye_servo_action/control.py y 25

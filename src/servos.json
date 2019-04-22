@@ -1,0 +1,16 @@
+{
+    "x": {
+        "limits": {
+            "min": 100,
+            "max": 680
+        },
+        "board_number": 1
+    },
+    "y": {
+        "limits": {
+            "min": 120,
+            "max": 580
+        },
+        "board_number": 0
+    }
+}

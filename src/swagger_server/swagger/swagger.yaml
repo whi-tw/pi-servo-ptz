@@ -1,0 +1,105 @@
+---
+swagger: "2.0"
+info:
+  description: "This is a Controller"
+  version: "1.0.0"
+  title: "PI Servo camera mount PT Controller"
+host: "petstore.swagger.io"
+basePath: "/v2"
+tags:
+- name: "move"
+  description: "Control the mount"
+schemes:
+- "https"
+- "http"
+paths:
+  /absolute:
+    post:
+      tags:
+      - "move"
+      summary: "Move the camera to point in an absolute direction"
+      operationId: "move_abs"
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "Object describing new position of camera"
+        required: true
+        schema:
+          $ref: "#/definitions/AbsPosition"
+      responses:
+        405:
+          description: "Invalid input"
+      x-swagger-router-controller: "swagger_server.controllers.move_controller"
+  /relative:
+    post:
+      tags:
+      - "move"
+      summary: "Move the camera relative to its current position"
+      operationId: "move_relative"
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "Object describing new position of camera"
+        required: true
+        schema:
+          $ref: "#/definitions/RelPosition"
+      responses:
+        405:
+          description: "Invalid input"
+      x-swagger-router-controller: "swagger_server.controllers.move_controller"
+definitions:
+  AbsPosition:
+    type: "object"
+    required:
+    - "x"
+    - "y"
+    properties:
+      x:
+        type: "integer"
+        format: "int64"
+      y:
+        type: "integer"
+        format: "int64"
+      speed:
+        type: "integer"
+        format: "int64"
+        default: 10
+    example:
+      x: 0
+      y: 6
+      speed: 1
+  RelPosition:
+    type: "object"
+    properties:
+      x:
+        type: "integer"
+        format: "int64"
+      y:
+        type: "integer"
+        format: "int64"
+      speed:
+        type: "integer"
+        format: "int64"
+        default: 10
+    example:
+      x: 0
+      y: 6
+      speed: 1
+  ApiResponse:
+    type: "object"
+    properties:
+      code:
+        type: "integer"
+        format: "int32"
+      type:
+        type: "string"
+      message:
+        type: "string"

@@ -126,7 +126,6 @@ class AbsPosition(Resource):
             args = parser.parse_args()
             errors = []
             success = []
-            app.logger.warn(args["position"])
             for servo in args["position"]:
                 if servos[servo["name"]]["limits"]["min"] <= servo["position"] <= servos[servo["name"]]["limits"]["max"]:
                     ptzservo.set_position(servos[servo["name"]]["channel"], servo["position"])

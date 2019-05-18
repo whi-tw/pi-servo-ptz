@@ -1,5 +1,4 @@
 #!/bin/sh
-curl -H "Content-Type: application/json"\
-  -X POST \
-  -d '{"position": [{"name": "x", "position": 250}, {"name": "y", "position": 350}]}' \
-  http://192.168.21.7:5000/absolute
+curl -X POST \
+  -H "Content-Type: application/json" \
+  127.0.0.1:5000/preset/motioneye_3

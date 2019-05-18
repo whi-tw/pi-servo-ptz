@@ -1,3 +1,6 @@
 .vscode
 *.pyc
-src/curpos.json src/servos.json
+src/curpos.json
+src/servos.json
+src/presets.json
+.python-version

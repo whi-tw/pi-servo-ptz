@@ -1,28 +1,44 @@
 import json
-import atexit
 
 from flask import Flask
 from flask_restful import Api, Resource, reqparse
 
-from servocontrol import PTZServo
+try:
+    from servocontrol import PTZServo
+except ModuleNotFoundError:
+    from fakes.servocontrol import PTZServo
 
 app = Flask(__name__)
 api = Api(app)
 
 servos = {}
-with open('servos.json', 'r') as f:
-    servos = json.load(f)
+try:
+    with open('servos.json', 'r') as f:
+        servos = json.load(f)
+except FileNotFoundError:
+    pass
 
 curpos = {}
-with open('curpos.json', 'r') as f:
-    curpos = json.load(f)
+try:
+    with open('curpos.json', 'r') as f:
+        curpos = json.load(f)
+except FileNotFoundError:
+    pass
+
+presets = {}
+try:
+    with open('presets.json', 'r') as f:
+        presets = json.load(f)
+except FileNotFoundError:
+    pass
 
 def write_out_json_files():
     with open('servos.json', 'w') as f:
         json.dump(servos, f)
     with open('curpos.json', 'w') as f:
         json.dump(curpos, f)
-atexit.register(write_out_json_files)
+    with open('presets.json', 'w') as f:
+        json.dump(presets, f)
 
 ptzservo = PTZServo()
 
@@ -75,8 +91,8 @@ class Servo(Resource):
             return servos[name], 200
         newServo = {
             "limits": {
-                "min": limit_min,
-                "max": limit_max
+                "min": args["limit_min"],
+                "max": args["limit_max"]
             },
             "channel": args["channel"]
         }
@@ -91,7 +107,7 @@ class Servo(Resource):
             write_out_json_files()
             return "Deleted: {}".format(name), 200
         except KeyError:
-            return "User with name {} not found".format(name), 404
+            return "Servo with name {} not found".format(name), 404
 
 
 class AbsPosition(Resource):
@@ -160,9 +176,62 @@ class RelPosition(Resource):
             return {"position": curpos[name]}, 200
         return "Servo {} not found".format(name), 404
 
+class Preset(Resource):
+    def get(self, name=None):
+        if name:
+            if name in presets.keys():
+                return presets[name], 200
+            else:
+                return "Preset with name {} not found".format(name), 404
+        else:
+            return presets, 200
+
+    def post(self, name):
+        if name in presets.keys():
+            for servo, position in presets[name].items():
+                ptzservo.set_position(servos[servo]["channel"], position)
+            return "", 204
+        else:
+            return {"errors": ["preset {} not found".format(name)]}
+
+
+    def put(self, name):
+        parser = reqparse.RequestParser()
+        parser.add_argument("servos", type=dict)
+        args = parser.parse_args()
+
+        preset = {}
+        for servo, position in args["servos"].items():
+            try:
+                if not servos[servo]["limits"]["min"] <= position <= servos[servo]["limits"]["max"]:
+                    return {"errors": ["position {} is outside of allowed range for servo {}".format(position, servo)]}, 400
+            except KeyError:
+                return {"errors": ["servo {} not found".format(servo)]}, 400
+            preset[servo] = position
+
+        if name in presets.keys():
+            presets[name] = preset
+            write_out_json_files()
+            return presets[name], 200
+        else:
+            presets[name] = preset
+            write_out_json_files()
+            return preset, 201
+
+
+    def delete(self, name):
+        try:
+            del presets[name]
+            write_out_json_files()
+            return "Deleted: {}".format(name), 200
+        except KeyError:
+            return {"errors": ["Preset with name {} not found".format(name)]}, 404
+
+
 api.add_resource(Servo, "/servo/<string:name>", "/servos")
 api.add_resource(AbsPosition, "/absolute/<string:name>", "/absolute")
 api.add_resource(RelPosition, "/relative/<string:name>")
+api.add_resource(Preset, "/preset/<string:name>", "/presets")
 
 if __name__ == "__main__":
     app.run(debug=True)

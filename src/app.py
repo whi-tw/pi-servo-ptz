@@ -1,10 +1,9 @@
-import json
-
 from flask import Flask
 from flask_restful import Api, Resource, reqparse
 from flask_restful_swagger import swagger
 
-from objects import State, Servos, Servo, ServoNotFound, MovementOutOfRange
+from objects import State, ServoNotFound, MovementOutOfRange,\
+    PresetNotFound, PresetMember, PresetMemberPositionOutOfRange
 
 try:
     from servocontrol import PTZServo
@@ -21,6 +20,7 @@ api = swagger.docs(Api(app), apiVersion='0.1',
 
 ptzservo = PTZServo()
 appstate = State()
+
 
 class APIError(object):
     error = None
@@ -40,11 +40,14 @@ class APIError(object):
             resp["error"] = self.error.__class__.__name__
         return resp
 
+
 def error_response_creator(*error: APIError):
     return {"errors": [e.format() for e in error]}
 
+
 class ServoResource(Resource):
-    def get(self, name=None):
+    @staticmethod
+    def get(name=None):
         if name:
             try:
                 return appstate.servos.get(name).serialize(), 200
@@ -53,7 +56,8 @@ class ServoResource(Resource):
         else:
             return appstate.servos.dump(), 200
 
-    def put(self, name):
+    @staticmethod
+    def put(name):
         parser = reqparse.RequestParser()
         parser.add_argument("limit_min", type=int)
         parser.add_argument("limit_max", type=int)
@@ -71,8 +75,8 @@ class ServoResource(Resource):
         appstate.dump()
         return created.serialize(), 201
 
-
-    def delete(self, name):
+    @staticmethod
+    def delete(name):
         try:
             appstate.servos.delete(name)
             return "Deleted: {}".format(name), 200
@@ -81,7 +85,8 @@ class ServoResource(Resource):
 
 
 class AbsPositionResource(Resource):
-    def get(self, name=None):
+    @staticmethod
+    def get(name=None):
         if name:
             try:
                 return appstate.servos.get(name).position, 200
@@ -90,13 +95,14 @@ class AbsPositionResource(Resource):
         else:
             return appstate.servos.positions(), 200
 
-    def post(self, name=None):
+    @staticmethod
+    def post(name=None):
         parser = reqparse.RequestParser()
         if name:
             parser.add_argument("position", type=int, required=True)
             args = parser.parse_args()
             try:
-                return appstate.servos.get(name).move_absolute(args["position"]), 200
+                return appstate.servos.get(name).move_absolute(args["position"]).serialize(), 200
             except MovementOutOfRange as e:
                 return error_response_creator(APIError(e.msg, name, e)), 403
             except ServoNotFound as e:
@@ -124,68 +130,67 @@ class AbsPositionResource(Resource):
             return {"positions": args["position"]}, 200
 
 
-
 class RelPositionResource(Resource):
-    def post(self, name):
+    @staticmethod
+    def post(name):
         parser = reqparse.RequestParser()
         parser.add_argument("movement", type=int, required=True)
         args = parser.parse_args()
         try:
-            return appstate.servos.get(name).move_relative(args["movement"])
+            return appstate.servos.get(name).move_relative(args["movement"]).serialize()
         except ServoNotFound as e:
             return error_response_creator(APIError(e.msg, name, e)), 404
 
+
 class PresetResource(Resource):
-    def get(self, name=None):
+    @staticmethod
+    def get(name=None):
         if name:
             try:
-                return appstate.get("presets")[name], 200
-            except KeyError:
-                return "Preset with name {} not found".format(name), 404
+                return appstate.presets.get(name), 200
+            except PresetNotFound as e:
+                return error_response_creator(APIError(e.msg, name, e)), 404
         else:
-            return presets, 200
+            return appstate.presets.dump(), 200
 
-    def post(self, name):
+    @staticmethod
+    def post(name):
         try:
-            for servo, position in appstate.get("presets")[name].items():
-                ptzservo.set_position(appstate.get("servos")[servo]["channel"], position)
-                # TODO: update curpos
+            appstate.presets.get(name).apply()
             return "", 204
-        except KeyError:
-            return {"errors": ["preset {} not found".format(name)]}
+        except PresetNotFound as e:
+            return error_response_creator(APIError(e.msg, name, e)), 404
 
-
-    def put(self, name):
+    @staticmethod
+    def put(name):
         parser = reqparse.RequestParser()
         parser.add_argument("servos", type=dict)
         args = parser.parse_args()
 
-        preset = {}
+        preset_members = []
         for servo, position in args["servos"].items():
             try:
-                if not appstate.get("servos")[servo]["limits"]["min"] <= position <= appstate.get("servos")[servo]["limits"]["max"]:
-                    return {"errors": ["position {} is outside of allowed range for servo {}".format(position, servo)]}, 400
-            except KeyError:
-                return {"errors": ["servo {} not found".format(servo)]}, 400
-            preset[servo] = position
+                preset_members.append(PresetMember(appstate.servos.get(servo), position))
+            except PresetMemberPositionOutOfRange as e:
+                return error_response_creator(APIError(e.msg, servo, e)), 403
 
-        if name in presets.keys():
-            appstate.state["presets"][name] = preset
+        if name in appstate.presets.all().keys():
+            appstate.presets.new(name, *preset_members)
             appstate.dump()
-            return appstate.get("presets")[name], 200
+            return appstate.presets.get(name).serialize(), 200
         else:
-            appstate.state["presets"][name] = preset
+            appstate.presets.new(name, *preset_members)
             appstate.dump()
-            return preset, 201
+            return appstate.presets.get(name).serialize(), 201
 
-
-    def delete(self, name):
+    @staticmethod
+    def delete(name):
         try:
-            del appstate.state["presets"][name]
-            write_out_json_files()
+            appstate.presets.delete(name)
+            appstate.dump()
             return "Deleted: {}".format(name), 200
-        except KeyError:
-            return {"errors": ["Preset with name {} not found".format(name)]}, 404
+        except PresetNotFound as e:
+            return error_response_creator(APIError(e.msg, name, e)), 404
 
 
 api.add_resource(ServoResource, "/servo/<string:name>", "/servos")

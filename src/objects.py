@@ -5,9 +5,11 @@ try:
 except ModuleNotFoundError:
     from fakes.servocontrol import PTZServo
 
+
 class CustomError(Exception):
     """Base Class for custom Exceptions"""
     pass
+
 
 class OutOfRange(CustomError):
     """Raised when something is outside of the allowed range
@@ -17,11 +19,12 @@ class OutOfRange(CustomError):
         allowed_range -- The min and max limits
         message -- explanation of why this is not allowed
         """
-    def __init__(self, current, next, allowed_range, message=None):
+    def __init__(self, current, desired, allowed_range, message=None):
         self.current = current
-        self.next = next
+        self.desired = desired
         self.allowed_range = allowed_range
         self.msg = message
+
 
 class MovementOutOfRange(OutOfRange):
     """Raised when a movement is outside of the allowed range of that servo
@@ -33,6 +36,7 @@ class MovementOutOfRange(OutOfRange):
         message -- explanation of why this specific movement is not allowed
         """
 
+
 class PresetMemberPositionOutOfRange(OutOfRange):
     """Raised when a preset's set movement is outside of the allowed range
 
@@ -42,8 +46,8 @@ class PresetMemberPositionOutOfRange(OutOfRange):
         allowed_range -- The min and max limits for this servo
         message -- explanation of why this specific movement is not allowed
         """
-    def __init__(self, next, allowed_range, message=None):
-        self.next = next
+    def __init__(self, desired, allowed_range, message=None):
+        self.desired = desired
         self.allowed_range = allowed_range
         self.msg = message
 
@@ -54,7 +58,7 @@ class NotFound(CustomError):
     Attributes:
         message -- a friendly message describing the error
         """
-    def __init__(self, name):
+    def __init__(self):
         self.msg = "not found"
 
 
@@ -64,7 +68,7 @@ class ServoNotFound(NotFound):
     Attributes:
         message -- a friendly message describing the error
         """
-    def __init__(self, name):
+    def __init__(self):
         self.msg = "Servo not found"
 
 
@@ -74,8 +78,9 @@ class PresetNotFound(NotFound):
     Attributes:
         message -- a friendly message describing the error
         """
-    def __init__(self, name):
+    def __init__(self):
         self.msg = "Preset not found"
+
 
 class Servo(object):
     limit_min = -1
@@ -83,8 +88,10 @@ class Servo(object):
     channel = -1
     position = -1
     ptzservo = None
+    name = None
 
-    def __init__(self, ptzservo, limit_min, limit_max, channel, position=None):
+    def __init__(self, ptzservo, name, limit_min, limit_max, channel, position=None):
+        self.name = name
         self.limit_min = limit_min
         self.limit_max = limit_max
         self.channel = channel
@@ -115,6 +122,7 @@ class Servo(object):
 
     def get_channel(self) -> int:
         return self.channel
+
     def get_position(self) -> int:
         return self.position
 
@@ -125,9 +133,10 @@ class Servo(object):
         if self.limit_min <= position <= self.limit_max:
             self.position = position
             self.make_it_so()
-            return self.serialize()
+            return self
         else:
-            raise MovementOutOfRange(self.position,
+            raise MovementOutOfRange(
+                self.position,
                 position,
                 (self.limit_min, self.limit_max),
                 "Position {} is {} than {}".format(
@@ -144,7 +153,8 @@ class Servo(object):
             desired_position = self.limit_max
         self.position = desired_position
         self.make_it_so()
-        return self.serialize()
+        return self
+
 
 class Servos(object):
     """Collection of Servo objects
@@ -160,10 +170,10 @@ class Servos(object):
         self.ptzservo = PTZServo()
         pass
 
-
     def new(self, name, data) -> Servo:
         self.servos[name] = Servo(
             self.ptzservo,
+            name,
             data["limits"]["min"],
             data["limits"]["max"],
             data["channel"],
@@ -175,7 +185,7 @@ class Servos(object):
         try:
             del self.servos[name]
         except KeyError:
-            raise ServoNotFound(name)
+            raise ServoNotFound()
 
     def populate(self, populate_data):
         for name, data in populate_data.items():
@@ -185,7 +195,7 @@ class Servos(object):
         try:
             return self.servos[name]
         except KeyError:
-            raise ServoNotFound(name)
+            raise ServoNotFound()
 
     def positions(self) -> dict:
         data = {}
@@ -202,6 +212,7 @@ class Servos(object):
             dump_data[name] = servo.serialize()
         return dump_data
 
+
 class PresetMember(object):
     servo = None
     position = -1
@@ -212,7 +223,7 @@ class PresetMember(object):
             self.servo = servo
         else:
             raise PresetMemberPositionOutOfRange(
-                next=servo.position,
+                desired=servo.position,
                 allowed_range=(servo.limit_min, servo.limit_max),
                 message="Position {} is {} than {}".format(
                     position,
@@ -221,7 +232,7 @@ class PresetMember(object):
                 ))
 
     def serialize(self):
-        return {"servo": self.servo, "position": self.position}
+        return {"servo": self.servo.name, "position": self.position}
 
     def apply(self):
         return self.servo.move_absolute(self.position)
@@ -234,8 +245,8 @@ class Preset(object):
         for member in members:
             self.members.append(member)
 
-    def serialize(self) -> list:
-        return [member.serialise() for member in self.members]
+    def serialize(self) -> dict:
+        return {member.servo.name: member.position for member in self.members}
 
     def apply(self):
         for member in self.members:
@@ -249,9 +260,10 @@ class Presets(object):
         presets -- A dict of "name": preset
     """
     presets = {}
+    servos = None
 
-    def __init__(self):
-        pass
+    def __init__(self, servos: Servos):
+        self.servos = servos
 
     def new(self, name: str, *members: PresetMember) -> Preset:
         self.presets[name] = Preset(*members)
@@ -261,20 +273,20 @@ class Presets(object):
         try:
             del self.presets[name]
         except KeyError:
-            raise PresetNotFound(name)
+            raise PresetNotFound()
 
-    def populate(self, servos: Servos, populate_data: dict):
+    def populate(self, populate_data: dict):
         for name, data in populate_data.items():
             members = []
             for servo_name, position in data.items():
-                members.append(PresetMember(servos.get(servo_name), position))
+                members.append(PresetMember(self.servos.get(servo_name), position))
             self.new(name, *members)
 
-    def get(self, name) -> Servo:
+    def get(self, name) -> Preset:
         try:
             return self.presets[name]
         except KeyError:
-            raise PresetNotFound(name)
+            raise PresetNotFound()
 
     def all(self) -> dict:
         return self.presets
@@ -285,9 +297,11 @@ class Presets(object):
             dump_data[name] = preset.serialize()
         return dump_data
 
+
 class State(object):
     servos = Servos()
-    presets = {}
+    presets = Presets(servos)
+
     def __init__(self):
         try:
             with open("servos.json", "r") as f:
@@ -299,8 +313,10 @@ class State(object):
 
         try:
             with open("presets.json", "r") as f:
-                self.presets = json.load(f)
+                self.presets.populate(json.load(f))
         except FileNotFoundError:
+            pass
+        except json.decoder.JSONDecodeError:
             pass
 
     def dump(self):
@@ -308,4 +324,4 @@ class State(object):
             json.dump(self.servos.dump(), f)
 
         with open("presets.json", "w") as f:
-            json.dump(self.presets, f)
+            json.dump(self.presets.dump(), f)

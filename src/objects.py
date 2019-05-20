@@ -153,6 +153,7 @@ class Servo(object):
             desired_position = self.limit_max
         self.position = desired_position
         self.make_it_so()
+
         return self
 
 

@@ -102,7 +102,9 @@ class AbsPositionResource(Resource):
             parser.add_argument("position", type=int, required=True)
             args = parser.parse_args()
             try:
-                return appstate.servos.get(name).move_absolute(args["position"]).serialize(), 200
+                move = appstate.servos.get(name).move_absolute(args["position"]).serialize()
+                appstate.dump()
+                return move, 200
             except MovementOutOfRange as e:
                 return error_response_creator(APIError(e.msg, name, e)), 403
             except ServoNotFound as e:
@@ -124,9 +126,11 @@ class AbsPositionResource(Resource):
                     resp["positions"] = [
                                    {"name": position, "position": appstate.servos.get(position).position}
                                    for position in args["position"] if position in success]
+                    appstate.dump()
                     return resp, 207
                 else:
                     return error_response_creator(*errors), 400
+            appstate.dump()
             return {"positions": args["position"]}, 200
 
 
@@ -137,7 +141,9 @@ class RelPositionResource(Resource):
         parser.add_argument("movement", type=int, required=True)
         args = parser.parse_args()
         try:
-            return appstate.servos.get(name).move_relative(args["movement"]).serialize()
+            move = appstate.servos.get(name).move_relative(args["movement"]).serialize()
+            appstate.dump()
+            return move, 200
         except ServoNotFound as e:
             return error_response_creator(APIError(e.msg, name, e)), 404
 
@@ -157,6 +163,7 @@ class PresetResource(Resource):
     def post(name):
         try:
             appstate.presets.get(name).apply()
+            appstate.dump()
             return "", 204
         except PresetNotFound as e:
             return error_response_creator(APIError(e.msg, name, e)), 404

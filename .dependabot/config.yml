@@ -3,6 +3,3 @@ update_configs:
   - package_manager: "python"
     directory: "/src"
     update_schedule: "live"
-  - package_manager: "docker"
-    directory: "/"
-    update_schedule: "daily"

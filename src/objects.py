@@ -241,13 +241,17 @@ class PresetMember(object):
 
 class Preset(object):
     members = []
+    name = None
 
-    def __init__(self, *members: PresetMember):
-        for member in members:
-            self.members.append(member)
+    def __init__(self, name, members):
+        self.name = name
+        self.members = members
 
     def serialize(self) -> dict:
-        return {member.servo.name: member.position for member in self.members}
+        data = {}
+        for member in self.members:
+            data[member.servo.name] = member.position
+        return data
 
     def apply(self):
         for member in self.members:
@@ -266,8 +270,8 @@ class Presets(object):
     def __init__(self, servos: Servos):
         self.servos = servos
 
-    def new(self, name: str, *members: PresetMember) -> Preset:
-        self.presets[name] = Preset(*members)
+    def new(self, name: str, members) -> Preset:
+        self.presets[name] = Preset(name, members)
         return self.presets[name]
 
     def delete(self, name) -> None:
@@ -281,7 +285,7 @@ class Presets(object):
             members = []
             for servo_name, position in data.items():
                 members.append(PresetMember(self.servos.get(servo_name), position))
-            self.new(name, *members)
+            self.new(name, members)
 
     def get(self, name) -> Preset:
         try:

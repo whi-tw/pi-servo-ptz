@@ -172,21 +172,26 @@ class PresetResource(Resource):
     def put(name):
         parser = reqparse.RequestParser()
         parser.add_argument("servos", type=dict)
+        parser.add_argument("current", type=bool)
         args = parser.parse_args()
 
         preset_members = []
-        for servo, position in args["servos"].items():
-            try:
-                preset_members.append(PresetMember(appstate.servos.get(servo), position))
-            except PresetMemberPositionOutOfRange as e:
-                return error_response_creator(APIError(e.msg, servo, e)), 403
+        if args["current"]:
+            for servo_name, servo in appstate.servos.all().items():
+                preset_members.append(PresetMember(servo, servo.position))
+        else:
+            for servo, position in args["servos"].items():
+                try:
+                    preset_members.append(PresetMember(appstate.servos.get(servo), position))
+                except PresetMemberPositionOutOfRange as e:
+                    return error_response_creator(APIError(e.msg, servo, e)), 403
 
         if name in appstate.presets.all().keys():
-            appstate.presets.new(name, *preset_members)
+            appstate.presets.new(name, preset_members)
             appstate.dump()
             return appstate.presets.get(name).serialize(), 200
         else:
-            appstate.presets.new(name, *preset_members)
+            appstate.presets.new(name, preset_members)
             appstate.dump()
             return appstate.presets.get(name).serialize(), 201
 

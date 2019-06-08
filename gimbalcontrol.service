@@ -3,7 +3,7 @@ Description=Pi Gimbal control
 
 [Service]
 User=pi
-WorkingDirectory=/home/pi/pi-servo-ptz/src
+WorkingDirectory=/home/pi/pi-servo-ptz
 ExecStart=/usr/bin/python3 -m flask run --host=0.0.0.0
 
 [Install]

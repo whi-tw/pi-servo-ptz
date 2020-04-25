@@ -8,7 +8,7 @@ chardet==3.0.4
 Click==7.0
 clickclick==1.2.2
 colorzero==1.1
-connexion==2.2.0
+connexion==2.7.0
 Flask==1.0.3
 Flask-RESTful==0.3.7
 flask-restful-swagger==0.20.1

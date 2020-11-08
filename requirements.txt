@@ -3,7 +3,7 @@ Adafruit-PCA9685==1.0.1
 Adafruit-PureIO==0.2.3
 aniso8601==7.0.0
 attrs==19.1.0
-certifi==2019.3.9
+certifi==2020.11.8
 chardet==3.0.4
 Click==7.0
 clickclick==1.2.2

@@ -23,7 +23,7 @@ pigpio==1.42
 pyrsistent==0.15.2
 python-dateutil==2.8.0
 pytz==2019.1
-PyYAML==5.1.1
+PyYAML==5.4
 requests==2.22.0
 six==1.12.0
 swagger-spec-validator==2.4.3
